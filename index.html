@@ -1,558 +1,563 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-// Define original aspect ratio
-const originalWidth = 600;
-const originalHeight = 800;
-let scaleFactor = 1;
-
-// Function to resize the canvas and update scale factor
-function resizeCanvas() {
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-
-    // Determine which dimension is the limiting factor
-    const widthRatio = screenWidth / originalWidth;
-    const heightRatio = screenHeight / originalHeight;
-    scaleFactor = Math.min(widthRatio, heightRatio);
-
-    canvas.width = originalWidth * scaleFactor;
-    canvas.height = originalHeight * scaleFactor;
-    
-    // Set a maximum size to avoid the canvas getting too big on large screens
-    if (canvas.width > 800) {
-        scaleFactor = 800 / originalWidth;
-        canvas.width = 800;
-        canvas.height = originalHeight * scaleFactor;
-    }
-}
-
-// Initial resize and a listener for window resize events
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-
-// Asset paths (make sure these are accessible from your HTML file)
-const assetPaths = {
-    sounds: {
-        bgm: 'assets/sounds/bgm.ogg',
-        coinS: 'assets/sounds/coinS.ogg',
-        gmover: 'assets/sounds/gmover.ogg'
-    },
-    images: {
-        river1: "assets/images/river1.png",
-        river2: "assets/images/river2.png",
-        river3: "assets/images/river3.png",
-        river4: "assets/images/river4.png",
-        river5: "assets/images/river5.png",
-        river6: "assets/images/river6.png",
-        boat: "assets/images/boat1.png",
-        wood1: "assets/images/wood1.png",
-        wood2: "assets/images/wood2.png",
-        wood3: "assets/images/wood3.png"
-    }
-};
-
-// Load assets
-const assets = {
-    sounds: {},
-    images: {}
-};
-
-let assetsLoaded = 0;
-const totalAssets = Object.keys(assetPaths.sounds).length + Object.keys(assetPaths.images).length;
-
-function assetLoaded() {
-    assetsLoaded++;
-    if (assetsLoaded === totalAssets) {
-        // All assets are loaded, start the game loop
-        requestAnimationFrame(gameLoop);
-    }
-}
-
-// Pre-load sounds
-for (const key in assetPaths.sounds) {
-    assets.sounds[key] = new Audio(assetPaths.sounds[key]);
-    assets.sounds[key].addEventListener('canplaythrough', assetLoaded, { once: true });
-}
-
-// Pre-load images
-for (const key in assetPaths.images) {
-    assets.images[key] = new Image();
-    assets.images[key].src = assetPaths.images[key];
-    assets.images[key].onload = assetLoaded;
-    assets.images[key].onerror = () => {
-        console.error(`Failed to load image: ${assetPaths.images[key]}`);
-        // Draw a placeholder if image fails to load
-        const placeholderCanvas = document.createElement('canvas');
-        const placeholderCtx = placeholderCanvas.getContext('2d');
-        placeholderCanvas.width = 64;
-        placeholderCanvas.height = 64;
-        placeholderCtx.fillStyle = 'red';
-        placeholderCtx.fillRect(0, 0, 64, 64);
-        assets.images[key].src = placeholderCanvas.toDataURL();
-    };
-}
-
-
-let river_speed = 0;
-function riverXY(x, y, river_speed) {
-    // Scale image dimensions
-    const imgWidth = assets.images.river1.width * scaleFactor;
-    const imgHeight = assets.images.river1.height * scaleFactor;
-    
-    // Scale coordinates
-    const scaledX = x * scaleFactor;
-    const scaledY = y * scaleFactor;
-    
-    if (river_speed >= 0 && river_speed <= 50) {
-        ctx.drawImage(assets.images.river1, scaledX, scaledY, imgWidth, imgHeight);
-    } else if (river_speed >= 51 && river_speed <= 100) {
-        ctx.drawImage(assets.images.river2, scaledX, scaledY, imgWidth, imgHeight);
-    } else if (river_speed >= 101 && river_speed <= 150) {
-        ctx.drawImage(assets.images.river3, scaledX, scaledY, imgWidth, imgHeight);
-    } else if (river_speed >= 151 && river_speed <= 200) {
-        ctx.drawImage(assets.images.river4, scaledX, scaledY, imgWidth, imgHeight);
-    } else if (river_speed >= 201 && river_speed <= 250) {
-        ctx.drawImage(assets.images.river5, scaledX, scaledY, imgWidth, imgHeight);
-    } else {
-        ctx.drawImage(assets.images.river6, scaledX, scaledY, imgWidth, imgHeight);
-    }
-}
-
-let boat_x = 300;
-let boat_y = 520;
-let boat_xChange = 0;
-
-function boatXY(x, y) {
-    ctx.drawImage(assets.images.boat, x * scaleFactor, y * scaleFactor, assets.images.boat.width * scaleFactor, assets.images.boat.height * scaleFactor);
-}
-
-// Floating wood
-let wood1_x = 170;
-let wood1_y = -50;
-let wood2_x = 320;
-let wood2_y = -200;
-let wood3_x = 350;
-let wood3_y = -350;
-let wood4_x = 220;
-let wood4_y = -480;
-let wood5_x = 190;
-let wood5_y = -630;
-let wood_speed = 2; //boat speed change
-
-function woodXY(x, y, wood_img) {
-    ctx.drawImage(wood_img, x * scaleFactor, y * scaleFactor, wood_img.width * scaleFactor, wood_img.height * scaleFactor);
-}
-
-// User interface
-let gameStart = false;
-const button_start = { x: 200, y: 690, width: 250, height: 80 };
-const button_pad = { x: 0, y: 650, width: 600, height: 150 };
-const button_left = { x: 20, y: 660, width: 120, height: 120 };
-const button_right = { x: 460, y: 660, width: 120, height: 120 };
-
-function draw_start_button() {
-    ctx.fillStyle = 'rgb(10, 200, 10)';
-    ctx.beginPath();
-    ctx.roundRect(button_start.x * scaleFactor, button_start.y * scaleFactor, button_start.width * scaleFactor, button_start.height * scaleFactor, [20 * scaleFactor]);
-    ctx.fill();
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.font = `${40 * scaleFactor}px sans-serif`;
-    ctx.fillText("START", (button_start.x + 50) * scaleFactor, (button_start.y + 50) * scaleFactor);
-}
-
-function draw_button_pad() {
-    ctx.fillStyle = 'rgb(200, 150, 200)';
-    ctx.fillRect(button_pad.x * scaleFactor, button_pad.y * scaleFactor, button_pad.width * scaleFactor, button_pad.height * scaleFactor);
-}
-
-function draw_buttons() {
-    ctx.fillStyle = 'rgb(100, 100, 100)';
-    ctx.beginPath();
-    ctx.roundRect(button_left.x * scaleFactor, button_left.y * scaleFactor, button_left.width * scaleFactor, button_left.height * scaleFactor, [20 * scaleFactor]);
-    ctx.fill();
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.font = `${40 * scaleFactor}px sans-serif`;
-    ctx.fillText("<<", (button_left.x + 30) * scaleFactor, (button_left.y + 75) * scaleFactor);
-
-    ctx.fillStyle = 'rgb(100, 100, 100)';
-    ctx.beginPath();
-    ctx.roundRect(button_right.x * scaleFactor, button_right.y * scaleFactor, button_right.width * scaleFactor, button_right.height * scaleFactor, [20 * scaleFactor]);
-    ctx.fill();
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.font = `${40 * scaleFactor}px sans-serif`;
-    ctx.fillText(">>", (button_right.x + 30) * scaleFactor, (button_right.y + 75) * scaleFactor);
-}
-
-// On-screen keyboard
-const keys_rows = [
-    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-    ["Z", "X", "C", "V", "B", "N", "M", "DEL", "ENT"]
-];
-
-const key_buttons = [];
-const key_width = 55;
-const key_height = 60;
-const padding = 5;
-const start_x = 5;
-const start_y = 450;
-
-keys_rows.forEach((row, row_idx) => {
-    let row_start_x = start_x;
-    if (row_idx === 1) row_start_x += 20;
-    if (row_idx === 2) row_start_x += 40;
-
-    row.forEach((k, col_idx) => {
-        const rect = {
-            key: k,
-            x: row_start_x + col_idx * (key_width + padding),
-            y: start_y + row_idx * (key_height + padding),
-            width: k.length > 1 ? key_width * 1.5 : key_width,
-            height: key_height
-        };
-        key_buttons.push(rect);
-    });
-});
-
-// Name box
-const input_box = { x: 150, y: 350, width: 400, height: 60 };
-let player_name = "";
-
-// Game over text
-function gameXY(x, y) {
-    ctx.font = `bold ${80 * scaleFactor}px sans-serif`;
-    ctx.fillStyle = 'rgb(110, 0, 0)';
-    ctx.fillText('GAME OVER', x * scaleFactor, y * scaleFactor);
-}
-
-let score_value = 0;
-function scoreXY(x, y, score_value, player_name) {
-    ctx.font = `bold ${24 * scaleFactor}px sans-serif`;
-    ctx.fillStyle = 'rgb(100, 0, 100)';
-    ctx.fillText('SCORE: ' + score_value, x * scaleFactor, y * scaleFactor);
-    ctx.fillText('Player: ' + player_name, (x - 100) * scaleFactor, (y + 45) * scaleFactor);
-}
-
-// Score save in Firebase
-let save_name_score = false;
-const FIREBASE_URL = "https://bambooblitz-413ec-default-rtdb.asia-southeast1.firebasedatabase.app/rivergame.json";
-
-async function save_score(player_name, score_value) {
-    const data = {
-        "name": player_name,
-        "score": score_value
-    };
-    try {
-        const response = await fetch(FIREBASE_URL, {
-            method: 'POST',
-            body: JSON.stringify(data),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        if (response.ok) {
-            console.log("Score saved successfully!");
-        } else {
-            console.error("Error saving score:", await response.text());
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>River Boat Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+            /* Prevent scrolling on mobile */
+            overflow: hidden;
         }
-    } catch (error) {
-        console.error("Network error:", error);
-    }
-}
+        canvas {
+            border: 1px solid #000;
+            background-color: #fff;
+            touch-action: none; /* Prevents default touch actions like scrolling and zooming */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
 
-let topScores = [];
-async function get_top_scores() {
-     try {
-        const response = await fetch(FIREBASE_URL);
-        if (response.ok) {
-            const data = await response.json();
-            if (!data) {
-                topScores = [];
-                return;
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Original game dimensions (all coordinates are based on this)
+        const originalWidth = 600;
+        const originalHeight = 800;
+        let scaleFactor = 1;
+
+        // Function to resize the canvas and update scale factor
+        function resizeCanvas() {
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+
+            const widthRatio = screenWidth / originalWidth;
+            const heightRatio = screenHeight / originalHeight;
+            scaleFactor = Math.min(widthRatio, heightRatio);
+
+            // Set canvas size to fit the screen while maintaining aspect ratio
+            canvas.width = originalWidth * scaleFactor;
+            canvas.height = originalHeight * scaleFactor;
+
+            // Set a maximum size for the canvas on very large screens
+            if (canvas.width > 800) {
+                scaleFactor = 800 / originalWidth;
+                canvas.width = 800;
+                canvas.height = originalHeight * scaleFactor;
             }
-            const scores = Object.values(data);
-            topScores = scores.sort((a, b) => b.score - a.score).slice(0, 10);
-        } else {
-            console.error("Error fetching scores:", await response.text());
-            topScores = [];
         }
-    } catch (error) {
-        console.error("Network error fetching scores:", error);
-        topScores = [];
-    }
-}
 
-function get_rank_str(index) {
-    if (index === 0) return "1st";
-    if (index === 1) return "2nd";
-    if (index === 2) return "3rd";
-    return `${index + 1}th`;
-}
+        // Initial resize and a listener for window resize events
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
-let gameOver = false;
-let running = true;
-let background_music_start = false;
-let gameOver_music = false;
+        // Asset paths (make sure these are accessible)
+        const assetPaths = {
+            sounds: {
+                bgm: 'assets/sounds/bgm.ogg',
+                coinS: 'assets/sounds/coinS.ogg',
+                gmover: 'assets/sounds/gmover.ogg'
+            },
+            images: {
+                river1: "assets/images/river1.png",
+                river2: "assets/images/river2.png",
+                river3: "assets/images/river3.png",
+                river4: "assets/images/river4.png",
+                river5: "assets/images/river5.png",
+                river6: "assets/images/river6.png",
+                boat: "assets/images/boat1.png",
+                wood1: "assets/images/wood1.png",
+                wood2: "assets/images/wood2.png",
+                wood3: "assets/images/wood3.png"
+            }
+        };
 
-function checkCollision(rect1, rect2) {
-    // Scale collision boxes
-    const scaledRect1 = {
-        x: rect1.x * scaleFactor,
-        y: rect1.y * scaleFactor,
-        width: rect1.width * scaleFactor,
-        height: rect1.height * scaleFactor
-    };
-    const scaledRect2 = {
-        x: rect2.x * scaleFactor,
-        y: rect2.y * scaleFactor,
-        width: rect2.width * scaleFactor,
-        height: rect2.height * scaleFactor
-    };
-    
-    return (
-        scaledRect1.x < scaledRect2.x + scaledRect2.width &&
-        scaledRect1.x + scaledRect1.width > scaledRect2.x &&
-        scaledRect1.y < scaledRect2.y + scaledRect2.height &&
-        scaledRect1.y + scaledRect1.height > scaledRect2.y
-    );
-}
+        // Load assets
+        const assets = {
+            sounds: {},
+            images: {}
+        };
 
-// --- Event Listeners ---
-function getCanvasPos(canvas, event) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = event.clientX || event.touches[0].clientX;
-    const clientY = event.clientY || event.touches[0].clientY;
-    return {
-        x: (clientX - rect.left) / scaleFactor,
-        y: (clientY - rect.top) / scaleFactor
-    };
-}
+        let assetsLoaded = 0;
+        const totalAssets = Object.keys(assetPaths.sounds).length + Object.keys(assetPaths.images).length;
 
-function isInside(pos, rect) {
-    return pos.x > rect.x && pos.x < rect.x + rect.width && pos.y < rect.y + rect.height && pos.y > rect.y;
-}
-
-// Unified event handler for both mouse and touch
-function handleInput(e) {
-    e.preventDefault();
-    const pos = getCanvasPos(canvas, e);
-    
-    if (isInside(pos, button_start) && !gameStart) {
-        if (player_name.trim() !== "") {
-            gameStart = true;
-            assets.sounds.coinS.currentTime = 0;
-            assets.sounds.coinS.play();
+        function assetLoaded() {
+            assetsLoaded++;
+            if (assetsLoaded === totalAssets) {
+                requestAnimationFrame(gameLoop);
+            }
         }
-    }
-    
-    if (gameStart) {
-        if (isInside(pos, button_right) && boat_x <= 400) {
-            assets.sounds.coinS.currentTime = 0;
-            assets.sounds.coinS.play();
-            boat_xChange = 4;
+
+        // Pre-load sounds
+        for (const key in assetPaths.sounds) {
+            assets.sounds[key] = new Audio(assetPaths.sounds[key]);
+            assets.sounds[key].addEventListener('canplaythrough', assetLoaded, { once: true });
+            assets.sounds[key].load(); // Added this for better mobile support
         }
-        if (isInside(pos, button_left) && boat_x >= 170) {
-            assets.sounds.coinS.currentTime = 0;
-            assets.sounds.coinS.play();
-            boat_xChange = -4;
+
+        // Pre-load images
+        for (const key in assetPaths.images) {
+            assets.images[key] = new Image();
+            assets.images[key].src = assetPaths.images[key];
+            assets.images[key].onload = assetLoaded;
+            assets.images[key].onerror = () => {
+                console.error(`Failed to load image: ${assetPaths.images[key]}`);
+                const placeholderCanvas = document.createElement('canvas');
+                const placeholderCtx = placeholderCanvas.getContext('2d');
+                placeholderCanvas.width = 64;
+                placeholderCanvas.height = 64;
+                placeholderCtx.fillStyle = 'red';
+                placeholderCtx.fillRect(0, 0, 64, 64);
+                assets.images[key].src = placeholderCanvas.toDataURL();
+            };
         }
-    } else { // Name entry screen
-        for (const keyRect of key_buttons) {
-            if (isInside(pos, keyRect)) {
-                if (keyRect.key === "DEL") {
-                    player_name = player_name.slice(0, -1);
-                } else if (keyRect.key === "ENT") {
-                    if (player_name.trim() !== "") {
-                        gameStart = true;
-                    }
+
+        let river_speed = 0;
+        function riverXY(x, y, river_speed) {
+            const imgWidth = assets.images.river1.width * scaleFactor;
+            const imgHeight = assets.images.river1.height * scaleFactor;
+            const scaledX = x * scaleFactor;
+            const scaledY = y * scaleFactor;
+
+            let riverImage;
+            if (river_speed >= 0 && river_speed <= 50) {
+                riverImage = assets.images.river1;
+            } else if (river_speed >= 51 && river_speed <= 100) {
+                riverImage = assets.images.river2;
+            } else if (river_speed >= 101 && river_speed <= 150) {
+                riverImage = assets.images.river3;
+            } else if (river_speed >= 151 && river_speed <= 200) {
+                riverImage = assets.images.river4;
+            } else if (river_speed >= 201 && river_speed <= 250) {
+                riverImage = assets.images.river5;
+            } else {
+                riverImage = assets.images.river6;
+            }
+            if (riverImage && riverImage.complete) { // Check if image is loaded
+                ctx.drawImage(riverImage, scaledX, scaledY, imgWidth, imgHeight);
+            }
+        }
+
+        let boat_x = 300;
+        let boat_y = 520;
+        let boat_xChange = 0;
+
+        function boatXY(x, y) {
+            if (assets.images.boat.complete) {
+                ctx.drawImage(assets.images.boat, x * scaleFactor, y * scaleFactor, assets.images.boat.width * scaleFactor, assets.images.boat.height * scaleFactor);
+            }
+        }
+
+        let wood1_x = 170;
+        let wood1_y = -50;
+        let wood2_x = 320;
+        let wood2_y = -200;
+        let wood3_x = 350;
+        let wood3_y = -350;
+        let wood4_x = 220;
+        let wood4_y = -480;
+        let wood5_x = 190;
+        let wood5_y = -630;
+        let wood_speed = 2;
+
+        function woodXY(x, y, wood_img) {
+            if (wood_img.complete) {
+                ctx.drawImage(wood_img, x * scaleFactor, y * scaleFactor, wood_img.width * scaleFactor, wood_img.height * scaleFactor);
+            }
+        }
+
+        let gameStart = false;
+        const button_start = { x: 200, y: 690, width: 250, height: 80 };
+        const button_pad = { x: 0, y: 650, width: 600, height: 150 };
+        const button_left = { x: 20, y: 660, width: 120, height: 120 };
+        const button_right = { x: 460, y: 660, width: 120, height: 120 };
+
+        function draw_start_button() {
+            ctx.fillStyle = 'rgb(10, 200, 10)';
+            ctx.beginPath();
+            ctx.roundRect(button_start.x * scaleFactor, button_start.y * scaleFactor, button_start.width * scaleFactor, button_start.height * scaleFactor, [20 * scaleFactor]);
+            ctx.fill();
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            ctx.font = `${40 * scaleFactor}px sans-serif`;
+            ctx.fillText("START", (button_start.x + 50) * scaleFactor, (button_start.y + 50) * scaleFactor);
+        }
+
+        function draw_button_pad() {
+            ctx.fillStyle = 'rgb(200, 150, 200)';
+            ctx.fillRect(button_pad.x * scaleFactor, button_pad.y * scaleFactor, button_pad.width * scaleFactor, button_pad.height * scaleFactor);
+        }
+
+        function draw_buttons() {
+            ctx.fillStyle = 'rgb(100, 100, 100)';
+            ctx.beginPath();
+            ctx.roundRect(button_left.x * scaleFactor, button_left.y * scaleFactor, button_left.width * scaleFactor, button_left.height * scaleFactor, [20 * scaleFactor]);
+            ctx.fill();
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            ctx.font = `${40 * scaleFactor}px sans-serif`;
+            ctx.fillText("<<", (button_left.x + 30) * scaleFactor, (button_left.y + 75) * scaleFactor);
+
+            ctx.fillStyle = 'rgb(100, 100, 100)';
+            ctx.beginPath();
+            ctx.roundRect(button_right.x * scaleFactor, button_right.y * scaleFactor, button_right.width * scaleFactor, button_right.height * scaleFactor, [20 * scaleFactor]);
+            ctx.fill();
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            ctx.font = `${40 * scaleFactor}px sans-serif`;
+            ctx.fillText(">>", (button_right.x + 30) * scaleFactor, (button_right.y + 75) * scaleFactor);
+        }
+
+        const keys_rows = [
+            ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+            ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+            ["Z", "X", "C", "V", "B", "N", "M", "DEL", "ENT"]
+        ];
+
+        const key_buttons = [];
+        const key_width = 55;
+        const key_height = 60;
+        const padding = 5;
+        const start_x = 5;
+        const start_y = 450;
+
+        keys_rows.forEach((row, row_idx) => {
+            let row_start_x = start_x;
+            if (row_idx === 1) row_start_x += 20;
+            if (row_idx === 2) row_start_x += 40;
+
+            row.forEach((k, col_idx) => {
+                const rect = {
+                    key: k,
+                    x: row_start_x + col_idx * (key_width + padding),
+                    y: start_y + row_idx * (key_height + padding),
+                    width: k.length > 1 ? key_width * 1.5 : key_width,
+                    height: key_height
+                };
+                key_buttons.push(rect);
+            });
+        });
+
+        const input_box = { x: 150, y: 350, width: 400, height: 60 };
+        let player_name = "";
+
+        function gameXY(x, y) {
+            ctx.font = `bold ${80 * scaleFactor}px sans-serif`;
+            ctx.fillStyle = 'rgb(110, 0, 0)';
+            ctx.fillText('GAME OVER', x * scaleFactor, y * scaleFactor);
+        }
+
+        let score_value = 0;
+        function scoreXY(x, y, score_value, player_name) {
+            ctx.font = `bold ${24 * scaleFactor}px sans-serif`;
+            ctx.fillStyle = 'rgb(100, 0, 100)';
+            ctx.fillText('SCORE: ' + score_value, x * scaleFactor, y * scaleFactor);
+            ctx.fillText('Player: ' + player_name, (x - 100) * scaleFactor, (y + 45) * scaleFactor);
+        }
+
+        let save_name_score = false;
+        const FIREBASE_URL = "https://bambooblitz-413ec-default-rtdb.asia-southeast1.firebasedatabase.app/rivergame.json";
+
+        async function save_score(player_name, score_value) {
+            const data = {
+                "name": player_name,
+                "score": score_value
+            };
+            try {
+                const response = await fetch(FIREBASE_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    console.log("Score saved successfully!");
                 } else {
-                    if (player_name.length < 16) {
-                        player_name += keyRect.key;
+                    console.error("Error saving score:", await response.text());
+                }
+            } catch (error) {
+                console.error("Network error:", error);
+            }
+        }
+
+        let topScores = [];
+        async function get_top_scores() {
+            try {
+                const response = await fetch(FIREBASE_URL);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (!data) {
+                        topScores = [];
+                        return;
+                    }
+                    const scores = Object.values(data);
+                    topScores = scores.sort((a, b) => b.score - a.score).slice(0, 10);
+                } else {
+                    console.error("Error fetching scores:", await response.text());
+                    topScores = [];
+                }
+            } catch (error) {
+                console.error("Network error fetching scores:", error);
+                topScores = [];
+            }
+        }
+
+        function get_rank_str(index) {
+            if (index === 0) return "1st";
+            if (index === 1) return "2nd";
+            if (index === 2) return "3rd";
+            return `${index + 1}th`;
+        }
+
+        let gameOver = false;
+        let background_music_start = false;
+        let gameOver_music = false;
+
+        function checkCollision(rect1, rect2) {
+            const scaledRect1 = {
+                x: rect1.x * scaleFactor,
+                y: rect1.y * scaleFactor,
+                width: rect1.width * scaleFactor,
+                height: rect1.height * scaleFactor
+            };
+            const scaledRect2 = {
+                x: rect2.x * scaleFactor,
+                y: rect2.y * scaleFactor,
+                width: rect2.width * scaleFactor,
+                height: rect2.height * scaleFactor
+            };
+
+            return (
+                scaledRect1.x < scaledRect2.x + scaledRect2.width &&
+                scaledRect1.x + scaledRect1.width > scaledRect2.x &&
+                scaledRect1.y < scaledRect2.y + scaledRect2.height &&
+                scaledRect1.y + scaledRect1.height > scaledRect2.y
+            );
+        }
+
+        function getCanvasPos(event) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = event.clientX || event.touches[0].clientX;
+            const clientY = event.clientY || event.touches[0].clientY;
+            return {
+                x: (clientX - rect.left) / scaleFactor,
+                y: (clientY - rect.top) / scaleFactor
+            };
+        }
+
+        function isInside(pos, rect) {
+            return pos.x > rect.x && pos.x < rect.x + rect.width && pos.y < rect.y + rect.height && pos.y > rect.y;
+        }
+
+        function handleInput(e) {
+            e.preventDefault();
+            const pos = getCanvasPos(e);
+
+            if (isInside(pos, button_start) && !gameStart) {
+                if (player_name.trim() !== "") {
+                    gameStart = true;
+                    assets.sounds.coinS.currentTime = 0;
+                    assets.sounds.coinS.play();
+                }
+            }
+
+            if (gameStart) {
+                if (isInside(pos, button_right) && boat_x <= 400) {
+                    assets.sounds.coinS.currentTime = 0;
+                    assets.sounds.coinS.play();
+                    boat_xChange = 4;
+                }
+                if (isInside(pos, button_left) && boat_x >= 170) {
+                    assets.sounds.coinS.currentTime = 0;
+                    assets.sounds.coinS.play();
+                    boat_xChange = -4;
+                }
+            } else {
+                for (const keyRect of key_buttons) {
+                    if (isInside(pos, keyRect)) {
+                        if (keyRect.key === "DEL") {
+                            player_name = player_name.slice(0, -1);
+                        } else if (keyRect.key === "ENT") {
+                            if (player_name.trim() !== "") {
+                                gameStart = true;
+                            }
+                        } else {
+                            if (player_name.length < 16) {
+                                player_name += keyRect.key;
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-}
 
-function handleInputEnd() {
-    boat_xChange = 0;
-}
-
-canvas.addEventListener('mousedown', handleInput);
-canvas.addEventListener('touchstart', handleInput);
-
-canvas.addEventListener('mouseup', handleInputEnd);
-canvas.addEventListener('touchend', handleInputEnd);
-
-// --- Main Game Loop ---
-function gameLoop() {
-    // Clear screen
-    ctx.fillStyle = 'rgb(255, 255, 255)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Game logic updates
-    if (gameStart && !gameOver) {
-        if (!background_music_start) {
-            assets.sounds.bgm.loop = true;
-            assets.sounds.bgm.volume = 0.3;
-            assets.sounds.bgm.play();
-            background_music_start = true;
-        }
-        river_speed += 5;
-    }
-    if (river_speed >= 300) {
-        river_speed = 0;
-    }
-
-    // Drawing river
-    riverXY(0, 0, river_speed);
-
-    // Woods floating after game start
-    if (gameStart && !gameOver) {
-        wood1_y += wood_speed;
-        if (wood1_y >= 710) {
-            wood1_x = 390 - (Math.floor(Math.random() * 7) * 30);
-            wood1_y = -80 - (Math.floor(Math.random() * 5) * 5);
-            score_value += 1;
-        }
-        wood2_y += wood_speed;
-        if (wood2_y >= 720) {
-            wood2_x = 170 + (Math.floor(Math.random() * 4) * 40);
-            wood2_y = -80 - (Math.floor(Math.random() * 5) * 5);
-            score_value += 1;
-        }
-        wood3_y += wood_speed;
-        if (wood3_y >= 730) {
-            wood3_x = 390 - (20 + Math.floor(Math.random() * 11) * 20);
-            wood3_y = -80 - (Math.floor(Math.random() * 3) * 10);
-            score_value += 1;
-        }
-        wood4_y += wood_speed;
-        if (wood4_y >= 740) {
-            wood4_x = 210 + (Math.floor(Math.random() * 7) * 20);
-            wood4_y = -80 - (Math.floor(Math.random() * 5) * 5);
-            score_value += 1;
-        }
-        wood5_y += wood_speed;
-        if (wood5_y >= 750) {
-            wood5_x = 250 + (Math.floor(Math.random() * 5) * 20);
-            wood5_y = -80 - (Math.floor(Math.random() * 5) * 5);
-            score_value += 1;
+        function handleInputEnd() {
+            boat_xChange = 0;
         }
 
-        let lastSpeedIncreaseScore = 0;
+        canvas.addEventListener('mousedown', handleInput);
+        canvas.addEventListener('touchstart', handleInput);
+        canvas.addEventListener('mouseup', handleInputEnd);
+        canvas.addEventListener('touchend', handleInputEnd);
 
-        if (score_value - lastSpeedIncreaseScore >= 20) {
-        wood_speed = 2 + (Math.floor(score_value / 20) * 0.5);
-        lastSpeedIncreaseScore = score_value - (score_value % 20); // update threshold
+        // --- Main Game Loop ---
+        function gameLoop() {
+            ctx.fillStyle = 'rgb(255, 255, 255)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameStart && !gameOver) {
+                if (!background_music_start) {
+                    assets.sounds.bgm.loop = true;
+                    assets.sounds.bgm.volume = 0.3;
+                    assets.sounds.bgm.play();
+                    background_music_start = true;
+                }
+                river_speed += 5;
+            }
+            if (river_speed >= 300) {
+                river_speed = 0;
             }
 
-    }
+            riverXY(0, 0, river_speed);
 
-    woodXY(wood1_x, wood1_y, assets.images.wood1);
-    woodXY(wood2_x, wood2_y, assets.images.wood2);
-    woodXY(wood3_x, wood3_y, assets.images.wood3);
-    woodXY(wood4_x, wood4_y, assets.images.wood2);
-    woodXY(wood5_x, wood5_y, assets.images.wood3);
+            if (gameStart && !gameOver) {
+                wood1_y += wood_speed;
+                if (wood1_y >= 710) {
+                    wood1_x = 390 - (Math.floor(Math.random() * 7) * 30);
+                    wood1_y = -80 - (Math.floor(Math.random() * 5) * 5);
+                    score_value += 1;
+                }
+                wood2_y += wood_speed;
+                if (wood2_y >= 720) {
+                    wood2_x = 170 + (Math.floor(Math.random() * 4) * 40);
+                    wood2_y = -80 - (Math.floor(Math.random() * 5) * 5);
+                    score_value += 1;
+                }
+                wood3_y += wood_speed;
+                if (wood3_y >= 730) {
+                    wood3_x = 390 - (20 + Math.floor(Math.random() * 11) * 20);
+                    wood3_y = -80 - (Math.floor(Math.random() * 3) * 10);
+                    score_value += 1;
+                }
+                wood4_y += wood_speed;
+                if (wood4_y >= 740) {
+                    wood4_x = 210 + (Math.floor(Math.random() * 7) * 20);
+                    wood4_y = -80 - (Math.floor(Math.random() * 5) * 5);
+                    score_value += 1;
+                }
+                wood5_y += wood_speed;
+                if (wood5_y >= 750) {
+                    wood5_x = 250 + (Math.floor(Math.random() * 5) * 20);
+                    wood5_y = -80 - (Math.floor(Math.random() * 5) * 5);
+                    score_value += 1;
+                }
 
-    // Boat control
-    if (!gameOver) {
-        boat_x += boat_xChange;
-    }
-    if (boat_x <= 170) boat_x = 170;
-    if (boat_x >= 400) boat_x = 400;
+                let lastSpeedIncreaseScore = 0;
+                if (score_value - lastSpeedIncreaseScore >= 20) {
+                    wood_speed = 2 + (Math.floor(score_value / 20) * 0.5);
+                    lastSpeedIncreaseScore = score_value - (score_value % 20);
+                }
+            }
 
-    boatXY(boat_x, boat_y);
+            woodXY(wood1_x, wood1_y, assets.images.wood1);
+            woodXY(wood2_x, wood2_y, assets.images.wood2);
+            woodXY(wood3_x, wood3_y, assets.images.wood3);
+            woodXY(wood4_x, wood4_y, assets.images.wood2);
+            woodXY(wood5_x, wood5_y, assets.images.wood3);
 
-    // Collision check
-    const boat_rect = { x: boat_x + 10, y: boat_y + 35, width: assets.images.boat.width - 10, height: assets.images.boat.height - 25 };
-    const wood1_rect = { x: wood1_x + 4, y: wood1_y + 5, width: assets.images.wood1.width - 10, height: assets.images.wood1.height - 7 };
-    const wood2_rect = { x: wood2_x, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
-    const wood3_rect = { x: wood3_x + 12, y: wood3_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
-    const wood4_rect = { x: wood4_x, y: wood4_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
-    const wood5_rect = { x: wood5_x + 12, y: wood5_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
+            if (!gameOver) {
+                boat_x += boat_xChange;
+            }
+            if (boat_x <= 170) boat_x = 170;
+            if (boat_x >= 400) boat_x = 400;
 
-    if (!gameOver && (checkCollision(boat_rect, wood1_rect) ||
-        checkCollision(boat_rect, wood2_rect) ||
-        checkCollision(boat_rect, wood3_rect) ||
-        checkCollision(boat_rect, wood4_rect) ||
-        checkCollision(boat_rect, wood5_rect))) {
-        gameOver = true;
-        if (!gameOver_music) {
-            assets.sounds.bgm.pause();
-            assets.sounds.gmover.play();
-            gameOver_music = true;
+            boatXY(boat_x, boat_y);
+
+            const boat_rect = { x: boat_x + 10, y: boat_y + 35, width: assets.images.boat.width - 10, height: assets.images.boat.height - 25 };
+            const wood1_rect = { x: wood1_x + 4, y: wood1_y + 5, width: assets.images.wood1.width - 10, height: assets.images.wood1.height - 7 };
+            const wood2_rect = { x: wood2_x, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
+            const wood3_rect = { x: wood3_x + 12, y: wood3_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
+            const wood4_rect = { x: wood4_x, y: wood4_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
+            const wood5_rect = { x: wood5_x + 12, y: wood5_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
+
+            if (!gameOver && (checkCollision(boat_rect, wood1_rect) || checkCollision(boat_rect, wood2_rect) || checkCollision(boat_rect, wood3_rect) || checkCollision(boat_rect, wood4_rect) || checkCollision(boat_rect, wood5_rect))) {
+                gameOver = true;
+                if (!gameOver_music) {
+                    assets.sounds.bgm.pause();
+                    assets.sounds.gmover.play();
+                    gameOver_music = true;
+                }
+            }
+
+            if (gameOver) {
+                gameXY(80, 170);
+                if (!save_name_score) {
+                    save_name_score = true;
+                    (async () => {
+                        await save_score(player_name, score_value);
+                        await get_top_scores();
+                    })();
+                }
+
+                let y_offset = 290;
+                const canvas_rect = { x: 160, y: y_offset - 60, width: 300, height: 370 };
+                ctx.fillStyle = 'rgba(200, 200, 255, 0.9)';
+                ctx.fillRect(canvas_rect.x * scaleFactor, canvas_rect.y * scaleFactor, canvas_rect.width * scaleFactor, canvas_rect.height * scaleFactor);
+
+                ctx.font = `bold ${40 * scaleFactor}px sans-serif`;
+                ctx.fillStyle = 'rgb(50, 0, 100)';
+                ctx.fillText("Leaderboard", 180 * scaleFactor, (y_offset - 20) * scaleFactor);
+
+                ctx.font = `${28 * scaleFactor}px sans-serif`;
+                ctx.fillStyle = 'rgb(10, 50, 10)';
+                topScores.forEach((player, idx) => {
+                    const rank = get_rank_str(idx);
+                    const name = player.name;
+                    const score = player.score;
+                    const text = `${rank}: ${name} - ${score}`;
+                    ctx.fillText(text, 180 * scaleFactor, (y_offset + 30 + (idx * 30)) * scaleFactor);
+                });
+            }
+
+            draw_button_pad();
+            if (gameStart) {
+                scoreXY(250, 690, score_value, player_name);
+                draw_buttons();
+            } else {
+                draw_start_button();
+
+                ctx.fillStyle = 'rgb(200, 200, 200)';
+                ctx.fillRect(input_box.x * scaleFactor, input_box.y * scaleFactor, input_box.width * scaleFactor, input_box.height * scaleFactor);
+                ctx.strokeStyle = 'rgb(100, 100, 100)';
+                ctx.lineWidth = 2 * scaleFactor;
+                ctx.strokeRect(input_box.x * scaleFactor, input_box.y * scaleFactor, input_box.width * scaleFactor, input_box.height * scaleFactor);
+
+                ctx.font = `${40 * scaleFactor}px sans-serif`;
+                if (player_name === "") {
+                    ctx.fillStyle = 'rgb(150, 150, 150)';
+                    ctx.fillText("Enter your name", (input_box.x + 5) * scaleFactor, (input_box.y + 45) * scaleFactor);
+                } else {
+                    ctx.fillStyle = 'rgb(0, 0, 0)';
+                    ctx.fillText(player_name, (input_box.x + 5) * scaleFactor, (input_box.y + 45) * scaleFactor);
+                }
+
+                key_buttons.forEach(rect => {
+                    ctx.fillStyle = 'rgb(180, 180, 180)';
+                    ctx.beginPath();
+                    ctx.roundRect(rect.x * scaleFactor, rect.y * scaleFactor, rect.width * scaleFactor, rect.height * scaleFactor, [8 * scaleFactor]);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgb(0, 0, 0)';
+                    ctx.font = `${30 * scaleFactor}px sans-serif`;
+                    ctx.fillText(rect.key, (rect.x + 10) * scaleFactor, (rect.y + 40) * scaleFactor);
+                });
+            }
+            requestAnimationFrame(gameLoop);
         }
-    }
-
-    // Game Over Screen
-    if (gameOver) {
-        gameXY(80, 170);
-        if (!save_name_score) {
-            save_name_score = true; // Set flag immediately to prevent multiple saves
-            // Use an async IIFE to ensure score is saved before fetching leaderboard
-            (async () => {
-                await save_score(player_name, score_value);
-                await get_top_scores(); // Fetch scores *after* saving
-            })();
-        }
-
-        let y_offset = 290;
-        const canvas_rect = { x: 160, y: y_offset - 60, width: 300, height: 370 };
-        ctx.fillStyle = 'rgba(200, 200, 255, 0.9)';
-        ctx.fillRect(canvas_rect.x * scaleFactor, canvas_rect.y * scaleFactor, canvas_rect.width * scaleFactor, canvas_rect.height * scaleFactor);
-
-        ctx.font = `bold ${40 * scaleFactor}px sans-serif`;
-        ctx.fillStyle = 'rgb(50, 0, 100)';
-        ctx.fillText("Leaderboard", 180 * scaleFactor, (y_offset - 20) * scaleFactor);
-
-        ctx.font = `${28 * scaleFactor}px sans-serif`;
-        ctx.fillStyle = 'rgb(10, 50, 10)';
-        topScores.forEach((player, idx) => {
-            const rank = get_rank_str(idx);
-            const name = player.name;
-            const score = player.score;
-            const text = `${rank}: ${name} - ${score}`;
-            ctx.fillText(text, 180 * scaleFactor, (y_offset + 30 + (idx * 30)) * scaleFactor);
-        });
-    }
-
-    // Draw button pad and UI elements
-    draw_button_pad();
-    if (gameStart) {
-        scoreXY(250, 690, score_value, player_name);
-        draw_buttons();
-    } else {
-        draw_start_button();
-
-        // Draw input box
-        ctx.fillStyle = 'rgb(200, 200, 200)';
-        ctx.fillRect(input_box.x * scaleFactor, input_box.y * scaleFactor, input_box.width * scaleFactor, input_box.height * scaleFactor);
-        ctx.strokeStyle = 'rgb(100, 100, 100)';
-        ctx.lineWidth = 2 * scaleFactor;
-        ctx.strokeRect(input_box.x * scaleFactor, input_box.y * scaleFactor, input_box.width * scaleFactor, input_box.height * scaleFactor);
-
-        ctx.font = `${40 * scaleFactor}px sans-serif`;
-        if (player_name === "") {
-            ctx.fillStyle = 'rgb(150, 150, 150)';
-            ctx.fillText("Enter your name", (input_box.x + 5) * scaleFactor, (input_box.y + 45) * scaleFactor);
-        } else {
-            ctx.fillStyle = 'rgb(0, 0, 0)';
-            ctx.fillText(player_name, (input_box.x + 5) * scaleFactor, (input_box.y + 45) * scaleFactor);
-        }
-
-        // Draw keyboard
-        key_buttons.forEach(rect => {
-            ctx.fillStyle = 'rgb(180, 180, 180)';
-            ctx.beginPath();
-            ctx.roundRect(rect.x * scaleFactor, rect.y * scaleFactor, rect.width * scaleFactor, rect.height * scaleFactor, [8 * scaleFactor]);
-            ctx.fill();
-            ctx.fillStyle = 'rgb(0, 0, 0)';
-            ctx.font = `${30 * scaleFactor}px sans-serif`;
-            ctx.fillText(rect.key, (rect.x + 10) * scaleFactor, (rect.y + 40) * scaleFactor);
-        });
-    }
-
-    // Loop
-    requestAnimationFrame(gameLoop);
-}
+    </script>
+</body>
+</html>
