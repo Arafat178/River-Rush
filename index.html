@@ -448,9 +448,9 @@
             // Collision check
             const boat_rect = { x: boat_x + 10, y: boat_y + 35, width: assets.images.boat.width - 10, height: assets.images.boat.height - 25 };
             const wood1_rect = { x: wood1_x + 4, y: wood1_y + 5, width: assets.images.wood1.width - 10, height: assets.images.wood1.height - 7 };
-            const wood2_rect = { x: wood2_x, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 10 };
+            const wood2_rect = { x: wood2_x+3, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
             const wood3_rect = { x: wood3_x + 12, y: wood3_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
-            const wood4_rect = { x: wood4_x, y: wood4_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 10 };
+            const wood4_rect = { x: wood4_x, y: wood4_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
             const wood5_rect = { x: wood5_x + 12, y: wood5_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
 
             if (!gameOver && (checkCollision(boat_rect, wood1_rect) ||
@@ -541,5 +541,6 @@
     </script>
 </body>
 </html>
+
 
 
