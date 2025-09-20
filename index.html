@@ -17,6 +17,12 @@
         canvas {
             border: 1px solid #000;
             background-color: #fff;
+            /* Add these properties for responsiveness */
+            width: 100vw; /* Viewport width */
+            height: 100vh; /* Viewport height */
+            max-width: 600px;
+            max-height: 800px;
+            object-fit: contain; /* Scales the canvas while maintaining its aspect ratio */
         }
     </style>
 </head>
@@ -26,6 +32,18 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+
+        // --- Responsiveness variables ---
+        const originalWidth = 600;
+        const originalHeight = 800;
+        let scaleX = canvas.clientWidth / originalWidth;
+        let scaleY = canvas.clientHeight / originalHeight;
+
+        // Re-calculate scale on window resize or orientation change
+        window.addEventListener('resize', () => {
+        scaleX = canvas.clientWidth / originalWidth;
+        scaleY = canvas.clientHeight / originalHeight;
+        });
 
         // Asset paths (make sure these are accessible from your HTML file)
         const assetPaths = {
@@ -289,9 +307,12 @@
         // --- Event Listeners ---
         function getMousePos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
+            const x = evt.clientX - rect.left;
+            const y = evt.clientY - rect.top;
             return {
-                x: evt.clientX - rect.left,
-                y: evt.clientY - rect.top
+            // Scale the mouse position to match the original game coordinates
+            x: x / scaleX,
+            y: y / scaleY
             };
         }
 
@@ -520,4 +541,5 @@
     </script>
 </body>
 </html>
+
 
