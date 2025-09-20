@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>River Boat Game</title>
     <style>
         body {
@@ -13,16 +13,20 @@
             margin: 0;
             background-color: #f0f0f0;
             font-family: sans-serif;
+            -webkit-user-select: none; /* Prevents text selection on iOS */
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none; /* Prevents text selection on other browsers */
         }
         canvas {
             border: 1px solid #000;
             background-color: #fff;
-            /* Add these properties for responsiveness */
-            width: 100vw; /* Viewport width */
-            height: 100vh; /* Viewport height */
+            width: 100vw;
+            height: 100vh;
             max-width: 600px;
             max-height: 800px;
-            object-fit: contain; /* Scales the canvas while maintaining its aspect ratio */
+            object-fit: contain;
+            touch-action: none; /* Disables double-tap zoom */
         }
     </style>
 </head>
@@ -41,8 +45,8 @@
 
         // Re-calculate scale on window resize or orientation change
         window.addEventListener('resize', () => {
-        scaleX = canvas.clientWidth / originalWidth;
-        scaleY = canvas.clientHeight / originalHeight;
+            scaleX = canvas.clientWidth / originalWidth;
+            scaleY = canvas.clientHeight / originalHeight;
         });
 
         // Asset paths (make sure these are accessible from your HTML file)
@@ -96,7 +100,6 @@
             assets.images[key].onload = assetLoaded;
             assets.images[key].onerror = () => {
                 console.error(`Failed to load image: ${assetPaths.images[key]}`);
-                // Draw a placeholder if image fails to load
                 const placeholderCanvas = document.createElement('canvas');
                 const placeholderCtx = placeholderCanvas.getContext('2d');
                 placeholderCanvas.width = 64;
@@ -263,7 +266,7 @@
 
         let topScores = [];
         async function get_top_scores() {
-             try {
+            try {
                 const response = await fetch(FIREBASE_URL);
                 if (response.ok) {
                     const data = await response.json();
@@ -305,14 +308,25 @@
         }
 
         // --- Event Listeners ---
-        function getMousePos(canvas, evt) {
+        function getPos(evt) {
             const rect = canvas.getBoundingClientRect();
-            const x = evt.clientX - rect.left;
-            const y = evt.clientY - rect.top;
+            let clientX, clientY;
+
+            if (evt.touches && evt.touches.length > 0) {
+                clientX = evt.touches[0].clientX;
+                clientY = evt.touches[0].clientY;
+            } else {
+                clientX = evt.clientX;
+                clientY = evt.clientY;
+            }
+
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // Scale the position to match the original game coordinates
             return {
-            // Scale the mouse position to match the original game coordinates
-            x: x / scaleX,
-            y: y / scaleY
+                x: x / scaleX,
+                y: y / scaleY
             };
         }
 
@@ -320,10 +334,11 @@
             return pos.x > rect.x && pos.x < rect.x + rect.width && pos.y < rect.y + rect.height && pos.y > rect.y;
         }
 
-        canvas.addEventListener('mousedown', async (e) => {
-            const mousePos = getMousePos(canvas, e);
+        function handleInput(e) {
+            e.preventDefault(); // Prevents touch-related browser actions
+            const pos = getPos(e);
 
-            if (isInside(mousePos, button_start) && !gameStart) {
+            if (isInside(pos, button_start) && !gameStart) {
                 if (player_name.trim() !== "") {
                     gameStart = true;
                     assets.sounds.coinS.currentTime = 0;
@@ -332,19 +347,19 @@
             }
 
             if (gameStart) {
-                if (isInside(mousePos, button_right) && boat_x <= 523) {
+                if (isInside(pos, button_right) && boat_x <= 523) {
                     assets.sounds.coinS.currentTime = 0;
                     assets.sounds.coinS.play();
                     boat_xChange = 4;
                 }
-                if (isInside(mousePos, button_left) && boat_x >= 121) {
+                if (isInside(pos, button_left) && boat_x >= 121) {
                     assets.sounds.coinS.currentTime = 0;
                     assets.sounds.coinS.play();
                     boat_xChange = -4;
                 }
-            } else { // Name entry screen
+            } else {
                 for (const keyRect of key_buttons) {
-                    if (isInside(mousePos, keyRect)) {
+                    if (isInside(pos, keyRect)) {
                         if (keyRect.key === "DEL") {
                             player_name = player_name.slice(0, -1);
                         } else if (keyRect.key === "ENT") {
@@ -359,11 +374,19 @@
                     }
                 }
             }
-        });
+        }
 
-        canvas.addEventListener('mouseup', () => {
+        function handleEnd() {
             boat_xChange = 0;
-        });
+        }
+        
+        // Add event listeners for both mouse and touch
+        canvas.addEventListener('mousedown', handleInput);
+        canvas.addEventListener('touchstart', handleInput);
+        canvas.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('touchend', handleEnd);
+        canvas.addEventListener('touchcancel', handleEnd);
+
 
         // --- Main Game Loop ---
         function gameLoop() {
@@ -424,9 +447,9 @@
                 let lastSpeedIncreaseScore = 0;
 
                 if (score_value - lastSpeedIncreaseScore >= 20) {
-                wood_speed = 2 + (Math.floor(score_value / 20) * 0.5);
-                lastSpeedIncreaseScore = score_value - (score_value % 20); // update threshold
-                    }
+                    wood_speed = 2 + (Math.floor(score_value / 20) * 0.5);
+                    lastSpeedIncreaseScore = score_value - (score_value % 20);
+                }
 
             }
 
@@ -448,7 +471,7 @@
             // Collision check
             const boat_rect = { x: boat_x + 10, y: boat_y + 35, width: assets.images.boat.width - 10, height: assets.images.boat.height - 25 };
             const wood1_rect = { x: wood1_x + 4, y: wood1_y + 5, width: assets.images.wood1.width - 10, height: assets.images.wood1.height - 7 };
-            const wood2_rect = { x: wood2_x+3, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
+            const wood2_rect = { x: wood2_x + 3, y: wood2_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
             const wood3_rect = { x: wood3_x + 12, y: wood3_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
             const wood4_rect = { x: wood4_x, y: wood4_y + 9, width: assets.images.wood2.width - 4, height: assets.images.wood2.height - 14 };
             const wood5_rect = { x: wood5_x + 12, y: wood5_y + 10, width: assets.images.wood3.width - 13, height: assets.images.wood3.height - 6 };
@@ -470,11 +493,10 @@
             if (gameOver) {
                 gameXY(80, 170);
                 if (!save_name_score) {
-                    save_name_score = true; // Set flag immediately to prevent multiple saves
-                    // Use an async IIFE to ensure score is saved before fetching leaderboard
+                    save_name_score = true;
                     (async () => {
                         await save_score(player_name, score_value);
-                        await get_top_scores(); // Fetch scores *after* saving
+                        await get_top_scores();
                     })();
                 }
 
@@ -537,10 +559,6 @@
             // Loop
             requestAnimationFrame(gameLoop);
         }
-
     </script>
 </body>
 </html>
-
-
-
