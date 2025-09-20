@@ -167,7 +167,7 @@
         let wood4_y = -480;
         let wood5_x = 190;
         let wood5_y = -630;
-        let wood_speed = 2;
+        let wood_speed = 1;
 
         function woodXY(x, y, wood_img) {
             if (wood_img.complete) {
@@ -458,9 +458,9 @@
                 }
 
                 let lastSpeedIncreaseScore = 0;
-                if (score_value - lastSpeedIncreaseScore >= 20) {
-                    wood_speed = 2 + (Math.floor(score_value / 20) * 0.5);
-                    lastSpeedIncreaseScore = score_value - (score_value % 20);
+                if (score_value - lastSpeedIncreaseScore >= 10) {
+                    wood_speed = 1 + (Math.floor(score_value / 10) * 0.5);
+                    lastSpeedIncreaseScore = score_value - (score_value % 10);
                 }
             }
 
@@ -561,3 +561,4 @@
     </script>
 </body>
 </html>
+
